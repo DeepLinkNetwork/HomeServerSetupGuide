@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Introduction and Network Setup - Home Server Setup Guide</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-server"></i> Home Server Setup Guide</h1>
+            <p>A comprehensive guide to setting up a secure and monitored home server</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../index.html#introduction">Introduction</a></li>
+                <li><a href="../index.html#components">Components</a></li>
+                <li><a href="../index.html#documentation">Documentation</a></li>
+                <li><a href="../index.html#resources">Resources</a></li>
+                <li><a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub <i class="fab fa-github"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="doc-page">
+            <h1>Introduction and Network Setup</h1>
+
+            <p>This guide will walk you through setting up your home server environment, including network configuration, domain setup, and basic system preparation.</p>
+
+            <h2>System Requirements</h2>
+
+            <p>Before starting, ensure your system meets these requirements:</p>
+
+            <ul>
+                <li>A computer with Ubuntu Server freshly installed</li>
+                <li>Minimum 4GB RAM (8GB or more recommended for running all services)</li>
+                <li>At least 50GB of free disk space</li>
+                <li>Docker and Docker Compose installed</li>
+                <li>SSH server configured and accessible</li>
+                <li>Static WAN IP address</li>
+                <li>Router with ports 80 and 443 forwarded to your server</li>
+            </ul>
+
+            <h2>Network Configuration</h2>
+
+            <h3>Static IP Setup</h3>
+
+            <p>For a reliable home server, you should configure a static internal IP address:</p>
+
+            <ol>
+                <li>
+                    <p>Identify your network interface:</p>
+                    <pre><code>ip a</code></pre>
+                </li>
+                <li>
+                    <p>Edit the Netplan configuration:</p>
+                    <pre><code>sudo nano /etc/netplan/00-installer-config.yaml</code></pre>
+                </li>
+                <li>
+                    <p>Configure a static IP (example configuration):</p>
+                    <pre><code>network:
+  version: 2
+  ethernets:
+    ens18:  # Replace with your interface name
+      dhcp4: no
+      addresses: [192.168.1.100/24]  # Choose an IP outside your router's DHCP range
+      gateway4: 192.168.1.1  # Your router's IP
+      nameservers:
+        addresses: [1.1.1.1, 8.8.8.8]</code></pre>
+                </li>
+                <li>
+                    <p>Apply the configuration:</p>
+                    <pre><code>sudo netplan apply</code></pre>
+                </li>
+            </ol>
+
+            <h3>Port Forwarding</h3>
+
+            <p>Configure your router to forward ports 80 and 443 to your server's internal IP address:</p>
+
+            <ol>
+                <li>Access your router's admin interface (typically http://192.168.1.1)</li>
+                <li>Navigate to port forwarding settings (may be under "Advanced" or "NAT/Gaming")</li>
+                <li>Create two port forwarding rules:
+                    <ul>
+                        <li>Forward external port 80 (HTTP) to internal port 80 on your server's IP</li>
+                        <li>Forward external port 443 (HTTPS) to internal port 443 on your server's IP</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <h3>Domain Setup</h3>
+
+            <p>For accessing your services remotely, you'll need a domain name:</p>
+
+            <ol>
+                <li>Purchase a domain from a registrar (Namecheap, GoDaddy, etc.)</li>
+                <li>Set up DNS A records pointing to your static WAN IP:
+                    <ul>
+                        <li>Create an A record for your root domain (e.g., <code>example.com</code>)</li>
+                        <li>Create wildcard A records for subdomains (e.g., <code>*.example.com</code>)</li>
+                    </ul>
+                </li>
+            </ol>
+
+            <p>If you don't want to purchase a domain, you can use a free dynamic DNS service like Duck DNS or No-IP.</p>
+
+            <h2>System Preparation</h2>
+
+            <h3>Update System</h3>
+
+            <p>First, ensure your system is up to date:</p>
+
+            <pre><code>sudo apt update && sudo apt upgrade -y</code></pre>
+
+            <h3>Install Required Packages</h3>
+
+            <p>Install some essential packages:</p>
+
+            <pre><code>sudo apt install -y curl wget git nano htop</code></pre>
+
+            <h3>Docker Setup Verification</h3>
+
+            <p>Verify Docker is installed and running:</p>
+
+            <pre><code>docker --version
+docker-compose --version
+sudo systemctl status docker</code></pre>
+
+            <p>If Docker is not installed, install it:</p>
+
+            <pre><code># Install Docker
+curl -fsSL https://get.docker.com -o get-docker.sh
+sudo sh get-docker.sh
+
+# Add your user to the docker group
+sudo usermod -aG docker $USER
+
+# Install Docker Compose
+sudo apt install -y docker-compose</code></pre>
+
+            <p>Log out and log back in for group changes to take effect.</p>
+
+            <h3>Create Docker Network</h3>
+
+            <p>Create a shared Docker network for all your services:</p>
+
+            <pre><code>docker network create proxy</code></pre>
+
+            <h3>Create Directory Structure</h3>
+
+            <p>Create a directory structure for your services:</p>
+
+            <pre><code>mkdir -p ~/docker/nginx-proxy-manager
+mkdir -p ~/docker/authelia
+mkdir -p ~/docker/monitoring/prometheus
+mkdir -p ~/docker/monitoring/grafana
+mkdir -p ~/docker/monitoring/alertmanager
+mkdir -p ~/docker/logging/loki
+mkdir -p ~/docker/logging/promtail</code></pre>
+
+            <h2>Next Steps</h2>
+
+            <p>Now that your system is prepared, you can proceed to the next section to set up Nginx Proxy Manager and Authelia for secure access to your services.</p>
+
+            <div class="navigation-links">
+                <a href="02-nginx-authelia.html" class="btn">Next: Nginx Proxy Manager & Authelia Setup</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Home Server Setup Guide | <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub Repository</a></p>
+        </div>
+    </footer>
+
+    <script src="../js/script.js"></script>
+</body>
+</html>

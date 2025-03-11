@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Server Setup Guide</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-server"></i> Home Server Setup Guide</h1>
+            <p>A comprehensive guide to setting up a secure and monitored home server</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="#introduction">Introduction</a></li>
+                <li><a href="#components">Components</a></li>
+                <li><a href="#documentation">Documentation</a></li>
+                <li><a href="#resources">Resources</a></li>
+                <li><a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub <i class="fab fa-github"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <section id="introduction">
+            <h2>Introduction</h2>
+            <div class="intro-content">
+                <div class="intro-text">
+                    <p>This guide provides step-by-step instructions for setting up a comprehensive home server environment using Ubuntu Server. Whether you're a hobbyist or a professional, this guide will help you create a secure, monitored, and well-organized server infrastructure.</p>
+                    <p>The setup includes reverse proxy with authentication, comprehensive monitoring, centralized logging, and security features to protect your services from threats.</p>
+                </div>
+                <div class="intro-image">
+                    <img src="images/server-diagram.png" alt="Home Server Architecture Diagram">
+                </div>
+            </div>
+        </section>
+
+        <section id="components">
+            <h2>Components</h2>
+            <div class="component-grid">
+                <div class="component-card">
+                    <div class="component-icon"><i class="fas fa-shield-alt"></i></div>
+                    <h3>Nginx Proxy Manager & Authelia</h3>
+                    <p>Secure access to your services with a reverse proxy and multi-factor authentication</p>
+                </div>
+                <div class="component-card">
+                    <div class="component-icon"><i class="fas fa-chart-line"></i></div>
+                    <h3>Prometheus & Grafana</h3>
+                    <p>Comprehensive monitoring and visualization of your server metrics</p>
+                </div>
+                <div class="component-card">
+                    <div class="component-icon"><i class="fas fa-file-alt"></i></div>
+                    <h3>Loki & Promtail</h3>
+                    <p>Centralized logging solution for all your services</p>
+                </div>
+                <div class="component-card">
+                    <div class="component-icon"><i class="fas fa-user-secret"></i></div>
+                    <h3>Security & Alerting</h3>
+                    <p>Tor exit node blocking and comprehensive alerting via email and Slack</p>
+                </div>
+            </div>
+        </section>
+
+        <section id="documentation">
+            <h2>Documentation</h2>
+            <div class="doc-container">
+                <div class="doc-sidebar">
+                    <ul>
+                        <li><a href="docs/01-introduction.html" class="active">Introduction & Network Setup</a></li>
+                        <li><a href="docs/02-nginx-authelia.html">Nginx Proxy Manager & Authelia</a></li>
+                        <li><a href="docs/03-prometheus-grafana.html">Prometheus & Grafana</a></li>
+                        <li><a href="docs/04-loki-promtail.html">Loki & Promtail</a></li>
+                        <li><a href="docs/05-security-alerting.html">Security & Alerting</a></li>
+                    </ul>
+                </div>
+                <div class="doc-content">
+                    <div class="doc-preview">
+                        <h3>Introduction & Network Setup</h3>
+                        <p>This guide will walk you through setting up your home server environment, including network configuration, domain setup, and basic system preparation.</p>
+                        <h4>System Requirements</h4>
+                        <ul>
+                            <li>A computer with Ubuntu Server freshly installed</li>
+                            <li>Minimum 4GB RAM (8GB or more recommended)</li>
+                            <li>At least 50GB of free disk space</li>
+                            <li>Docker and Docker Compose installed</li>
+                            <li>SSH server configured and accessible</li>
+                            <li>Static WAN IP address</li>
+                            <li>Router with ports 80 and 443 forwarded</li>
+                        </ul>
+                        <a href="docs/01-introduction.html" class="btn">Read More</a>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="resources">
+            <h2>Resources</h2>
+            <div class="resources-grid">
+                <div class="resource-card">
+                    <div class="resource-icon"><i class="fab fa-docker"></i></div>
+                    <h3>Docker Compose Files</h3>
+                    <p>Ready-to-use Docker Compose configurations for all services</p>
+                    <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide/tree/main/config" class="btn">View Files</a>
+                </div>
+                <div class="resource-card">
+                    <div class="resource-icon"><i class="fas fa-terminal"></i></div>
+                    <h3>Helper Scripts</h3>
+                    <p>Useful scripts for maintenance and security</p>
+                    <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide/tree/main/scripts" class="btn">View Scripts</a>
+                </div>
+                <div class="resource-card">
+                    <div class="resource-icon"><i class="fas fa-file-code"></i></div>
+                    <h3>Configuration Templates</h3>
+                    <p>Configuration templates for all services</p>
+                    <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide/tree/main/config" class="btn">View Templates</a>
+                </div>
+                <div class="resource-card">
+                    <div class="resource-icon"><i class="fas fa-book"></i></div>
+                    <h3>External Resources</h3>
+                    <p>Links to official documentation and useful resources</p>
+                    <a href="#" class="btn">View Resources</a>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Home Server Setup Guide | <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub Repository</a></p>
+        </div>
+    </footer>
+
+    <script src="js/script.js"></script>
+</body>
+</html>

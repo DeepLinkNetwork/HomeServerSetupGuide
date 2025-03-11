@@ -1,0 +1,379 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Loki and Promtail Logging Setup - Home Server Setup Guide</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-server"></i> Home Server Setup Guide</h1>
+            <p>A comprehensive guide to setting up a secure and monitored home server</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../index.html#introduction">Introduction</a></li>
+                <li><a href="../index.html#components">Components</a></li>
+                <li><a href="../index.html#documentation">Documentation</a></li>
+                <li><a href="../index.html#resources">Resources</a></li>
+                <li><a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub <i class="fab fa-github"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="doc-page">
+            <h1>Loki and Promtail Logging Setup</h1>
+
+            <p>This guide will walk you through setting up a centralized logging solution for your home server using Loki and Promtail. This stack will allow you to:</p>
+
+            <ul>
+                <li>Collect logs from your server and services</li>
+                <li>Store logs efficiently with Loki</li>
+                <li>Query and analyze logs through Grafana</li>
+                <li>Set up alerts based on log patterns</li>
+                <li>Troubleshoot issues across your entire infrastructure</li>
+            </ul>
+
+            <h2>Directory Structure</h2>
+
+            <p>First, ensure you have the proper directory structure:</p>
+
+            <pre><code>mkdir -p ~/docker/logging/loki/config
+mkdir -p ~/docker/logging/promtail/config</code></pre>
+
+            <h2>Loki Setup</h2>
+
+            <p>Loki is a horizontally-scalable, highly-available, multi-tenant log aggregation system inspired by Prometheus. It's designed to be very cost-effective and easy to operate.</p>
+
+            <h3>Loki Configuration</h3>
+
+            <p>Create the Loki configuration file:</p>
+
+            <pre><code>nano ~/docker/logging/loki/config/loki-config.yml</code></pre>
+
+            <p>Add the following content:</p>
+
+            <pre><code>auth_enabled: false
+
+server:
+  http_listen_port: 3100
+  grpc_listen_port: 9096
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    instance_addr: 127.0.0.1
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2020-10-24
+      store: boltdb-shipper
+      object_store: filesystem
+      schema: v11
+      index:
+        prefix: index_
+        period: 24h
+
+ruler:
+  alertmanager_url: http://alertmanager:9093
+
+limits_config:
+  enforce_metric_name: false
+  reject_old_samples: true
+  reject_old_samples_max_age: 168h
+
+analytics:
+  reporting_enabled: false</code></pre>
+
+            <h2>Promtail Setup</h2>
+
+            <p>Promtail is an agent which ships the contents of local logs to a Loki instance.</p>
+
+            <h3>Promtail Configuration</h3>
+
+            <p>Create the Promtail configuration file:</p>
+
+            <pre><code>nano ~/docker/logging/promtail/config/promtail-config.yml</code></pre>
+
+            <p>Add the following content:</p>
+
+            <pre><code>server:
+  http_listen_port: 9080
+  grpc_listen_port: 0
+
+positions:
+  filename: /tmp/positions.yaml
+
+clients:
+  - url: http://loki:3100/loki/api/v1/push
+
+scrape_configs:
+  - job_name: system
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: varlogs
+          __path__: /var/log/*log
+
+  - job_name: docker
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: docker
+          __path__: /var/lib/docker/containers/*/*log
+
+  - job_name: nginx
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: nginx
+          __path__: /var/log/nginx/*log
+
+  - job_name: authelia
+    static_configs:
+      - targets:
+          - localhost
+        labels:
+          job: authelia
+          __path__: /home/ubuntu/docker/authelia/config/notification.txt</code></pre>
+
+            <h2>Docker Compose Configuration</h2>
+
+            <p>Create a docker-compose.yml file for the logging stack:</p>
+
+            <pre><code>nano ~/docker/logging/docker-compose.yml</code></pre>
+
+            <p>Add the following content:</p>
+
+            <pre><code>version: '3.8'
+
+services:
+  loki:
+    image: grafana/loki:latest
+    container_name: loki
+    restart: unless-stopped
+    volumes:
+      - ./loki/config:/etc/loki
+      - loki_data:/loki
+    command: -config.file=/etc/loki/loki-config.yml
+    ports:
+      - "3100:3100"
+    networks:
+      - proxy
+    profiles:
+      - logging
+
+  promtail:
+    image: grafana/promtail:latest
+    container_name: promtail
+    restart: unless-stopped
+    volumes:
+      - ./promtail/config:/etc/promtail
+      - /var/log:/var/log
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /home/ubuntu/docker:/home/ubuntu/docker:ro
+    command: -config.file=/etc/promtail/promtail-config.yml
+    ports:
+      - "9080:9080"
+    networks:
+      - proxy
+    profiles:
+      - logging
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  loki_data:</code></pre>
+
+            <h2>Starting the Logging Stack</h2>
+
+            <p>Start the logging stack with Docker Compose:</p>
+
+            <pre><code>cd ~/docker/logging
+docker-compose --profile logging up -d</code></pre>
+
+            <h2>Configuring Nginx Proxy Manager for Loki</h2>
+
+            <p>Set up a proxy host in Nginx Proxy Manager for Loki:</p>
+
+            <ol>
+                <li>Go to "Hosts" > "Proxy Hosts" and click "Add Proxy Host"</li>
+                <li>Configure the following:
+                    <ul>
+                        <li>Domain Name: loki.yourdomain.com</li>
+                        <li>Scheme: http</li>
+                        <li>Forward Hostname / IP: loki</li>
+                        <li>Forward Port: 3100</li>
+                    </ul>
+                </li>
+                <li>Under the "SSL" tab:
+                    <ul>
+                        <li>Select your SSL certificate</li>
+                        <li>Force SSL: Enabled</li>
+                    </ul>
+                </li>
+                <li>Under the "Advanced" tab, add the Authelia configuration (from the previous guide)</li>
+                <li>Click "Save"</li>
+            </ol>
+
+            <h2>Integrating Loki with Grafana</h2>
+
+            <p>Now, let's add Loki as a data source in Grafana:</p>
+
+            <ol>
+                <li>Access Grafana at https://grafana.yourdomain.com</li>
+                <li>Go to "Configuration" > "Data Sources"</li>
+                <li>Click "Add data source"</li>
+                <li>Select "Loki"</li>
+                <li>Set the URL to http://loki:3100</li>
+                <li>Click "Save & Test"</li>
+            </ol>
+
+            <h2>Creating Log Dashboards in Grafana</h2>
+
+            <p>Let's create a basic log dashboard:</p>
+
+            <ol>
+                <li>Go to "Create" > "Dashboard"</li>
+                <li>Click "Add new panel"</li>
+                <li>Select "Loki" as the data source</li>
+                <li>In the query field, enter a LogQL query:
+                    <pre><code>{job="varlogs"}</code></pre>
+                </li>
+                <li>Adjust the time range as needed</li>
+                <li>Click "Apply"</li>
+            </ol>
+
+            <h3>Importing Log Dashboards</h3>
+
+            <p>You can also import pre-made dashboards:</p>
+
+            <ol>
+                <li>Go to "Create" > "Import"</li>
+                <li>Enter dashboard ID 13639 (Loki Dashboard)</li>
+                <li>Click "Load"</li>
+                <li>Select "Loki" as the data source</li>
+                <li>Click "Import"</li>
+            </ol>
+
+            <h2>Advanced Log Queries</h2>
+
+            <p>Loki uses LogQL, a query language inspired by PromQL. Here are some useful queries:</p>
+
+            <h3>Filter by Log Content</h3>
+
+            <pre><code>{job="docker"} |= "error"</code></pre>
+
+            <p>This shows all logs from the "docker" job containing the word "error".</p>
+
+            <h3>Filter by Regular Expression</h3>
+
+            <pre><code>{job="nginx"} |~ "GET /api/.*"</code></pre>
+
+            <p>This shows all logs from the "nginx" job matching the regular expression.</p>
+
+            <h3>Count Error Occurrences</h3>
+
+            <pre><code>count_over_time({job="varlogs"} |= "error"[1h])</code></pre>
+
+            <p>This counts how many times "error" appears in the logs over the last hour.</p>
+
+            <h2>Setting Up Log-Based Alerts</h2>
+
+            <p>You can set up alerts based on log patterns:</p>
+
+            <ol>
+                <li>In Grafana, go to "Alerting" > "New alert rule"</li>
+                <li>Configure a Loki query, for example:
+                    <pre><code>count_over_time({job="varlogs"} |= "error"[5m]) > 10</code></pre>
+                </li>
+                <li>This will alert if there are more than 10 errors in 5 minutes</li>
+                <li>Set notification channels and save the alert</li>
+            </ol>
+
+            <h2>Log Retention and Management</h2>
+
+            <p>By default, Loki will retain logs based on the configuration in the <code>limits_config</code> section. You can adjust the retention period by modifying the <code>reject_old_samples_max_age</code> value.</p>
+
+            <p>For example, to keep logs for 30 days:</p>
+
+            <pre><code>limits_config:
+  reject_old_samples: true
+  reject_old_samples_max_age: 720h  # 30 days</code></pre>
+
+            <h2>Troubleshooting</h2>
+
+            <h3>Loki Issues</h3>
+
+            <ul>
+                <li>Check logs: <code>docker logs loki</code></li>
+                <li>Verify loki-config.yml syntax</li>
+                <li>Check if Loki is accessible: <code>curl http://localhost:3100/ready</code></li>
+            </ul>
+
+            <h3>Promtail Issues</h3>
+
+            <ul>
+                <li>Check logs: <code>docker logs promtail</code></li>
+                <li>Verify promtail-config.yml syntax</li>
+                <li>Check if Promtail is sending logs: <code>curl http://localhost:9080/metrics | grep loki_sent</code></li>
+            </ul>
+
+            <h3>Grafana Integration Issues</h3>
+
+            <ul>
+                <li>Verify the Loki data source URL</li>
+                <li>Check network connectivity between Grafana and Loki</li>
+                <li>Verify that Loki is receiving logs: <code>curl -G -s "http://localhost:3100/loki/api/v1/label" --data-urlencode 'match={}'</code></li>
+            </ul>
+
+            <h2>Best Practices</h2>
+
+            <ol>
+                <li><strong>Log Rotation</strong>: Ensure your system has proper log rotation configured to prevent disk space issues</li>
+                <li><strong>Query Optimization</strong>: Use label filters before content filters for better performance</li>
+                <li><strong>Label Management</strong>: Use meaningful labels but avoid high cardinality</li>
+                <li><strong>Resource Allocation</strong>: Monitor Loki's resource usage and adjust as needed</li>
+                <li><strong>Security</strong>: Protect access to your logs as they may contain sensitive information</li>
+            </ol>
+
+            <h2>Next Steps</h2>
+
+            <p>Now that you have your logging stack set up, you can proceed to the next section to configure security features including automatic Tor users blocking and additional alerting options.</p>
+
+            <div class="navigation-links">
+                <a href="03-prometheus-grafana.html" class="btn">Previous: Prometheus & Grafana Setup</a>
+                <a href="05-security-alerting.html" class="btn">Next: Security & Alerting Setup</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Home Server Setup Guide | <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub Repository</a></p>
+        </div>
+    </footer>
+
+    <script src="../js/script.js"></script>
+</body>
+</html>

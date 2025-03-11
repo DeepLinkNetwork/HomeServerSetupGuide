@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prometheus and Grafana Monitoring Setup - Home Server Setup Guide</title>
+    <link rel="stylesheet" href="../css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-server"></i> Home Server Setup Guide</h1>
+            <p>A comprehensive guide to setting up a secure and monitored home server</p>
+        </div>
+    </header>
+
+    <nav>
+        <div class="container">
+            <ul>
+                <li><a href="../index.html">Home</a></li>
+                <li><a href="../index.html#introduction">Introduction</a></li>
+                <li><a href="../index.html#components">Components</a></li>
+                <li><a href="../index.html#documentation">Documentation</a></li>
+                <li><a href="../index.html#resources">Resources</a></li>
+                <li><a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub <i class="fab fa-github"></i></a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="container">
+        <div class="doc-page">
+            <h1>Prometheus and Grafana Monitoring Setup</h1>
+
+            <p>This guide will walk you through setting up a comprehensive monitoring solution for your home server using Prometheus, Grafana, and Alert Manager. This stack will allow you to:</p>
+
+            <ul>
+                <li>Collect metrics from your server and services</li>
+                <li>Visualize performance data with customizable dashboards</li>
+                <li>Set up alerts for critical events</li>
+                <li>Monitor system health and resource usage</li>
+            </ul>
+
+            <h2>Directory Structure</h2>
+
+            <p>First, ensure you have the proper directory structure:</p>
+
+            <pre><code>mkdir -p ~/docker/monitoring/prometheus/config
+mkdir -p ~/docker/monitoring/grafana
+mkdir -p ~/docker/monitoring/alertmanager/config
+mkdir -p ~/docker/monitoring/node-exporter</code></pre>
+
+            <h2>Prometheus Setup</h2>
+
+            <p>Prometheus is an open-source systems monitoring and alerting toolkit. It collects and stores metrics as time series data.</p>
+
+            <h3>Prometheus Configuration</h3>
+
+            <p>Create the Prometheus configuration file:</p>
+
+            <pre><code>nano ~/docker/monitoring/prometheus/config/prometheus.yml</code></pre>
+
+            <p>Add the following content:</p>
+
+            <pre><code>global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+scrape_configs:
+  - job_name: "prometheus"
+    static_configs:
+      - targets: ["localhost:9090"]
+
+  - job_name: "node"
+    static_configs:
+      - targets: ["node-exporter:9100"]
+
+  - job_name: "cadvisor"
+    static_configs:
+      - targets: ["cadvisor:8080"]
+
+  - job_name: "nginx-proxy-manager"
+    static_configs:
+      - targets: ["nginx-proxy-manager:81"]
+    metrics_path: /metrics
+    
+  - job_name: "loki"
+    static_configs:
+      - targets: ["loki:3100"]</code></pre>
+
+            <p>Create a directory for alert rules:</p>
+
+            <pre><code>mkdir -p ~/docker/monitoring/prometheus/config/rules</code></pre>
+
+            <p>Create a basic alert rules file:</p>
+
+            <pre><code>nano ~/docker/monitoring/prometheus/config/rules/alerts.yml</code></pre>
+
+            <p>Add the following content:</p>
+
+            <pre><code>groups:
+  - name: basic_alerts
+    rules:
+      - alert: HighCPULoad
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU load (instance {{ $labels.instance }})"
+          description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+      - alert: HighMemoryLoad
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory load (instance {{ $labels.instance }})"
+          description: "Memory load is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+      - alert: HighDiskUsage
+        expr: (node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_free_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"} * 100 > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High disk usage (instance {{ $labels.instance }})"
+          description: "Disk usage is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"</code></pre>
+
+            <h2>Alert Manager Setup</h2>
+
+            <p>Alert Manager handles alerts sent by Prometheus and routes them to the appropriate receiver.</p>
+
+            <p>Create the Alert Manager configuration file:</p>
+
+            <pre><code>nano ~/docker/monitoring/alertmanager/config/alertmanager.yml</code></pre>
+
+            <p>Add the following content (customize with your email or Slack details):</p>
+
+            <pre><code>global:
+  resolve_timeout: 5m
+  # For email alerts
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'your-email@gmail.com'
+  smtp_auth_username: 'your-email@gmail.com'
+  smtp_auth_password: 'your-app-password'  # Use app password for Gmail
+  smtp_require_tls: true
+
+# Route all alerts to all receivers
+route:
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'email-notifications'
+  routes:
+    - match:
+        severity: critical
+      receiver: 'slack-notifications'
+      continue: true
+
+receivers:
+  - name: 'email-notifications'
+    email_configs:
+      - to: 'your-email@gmail.com'
+        send_resolved: true
+  
+  - name: 'slack-notifications'
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#alerts'
+        send_resolved: true
+        title: "{{ .GroupLabels.alertname }}"
+        text: "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}"
+
+inhibit_rules:
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname']</code></pre>
+
+            <h2>Node Exporter Setup</h2>
+
+            <p>Node Exporter collects hardware and OS metrics from the host system.</p>
+
+            <h2>Docker Compose Configuration</h2>
+
+            <p>Create a docker-compose.yml file for the monitoring stack:</p>
+
+            <pre><code>nano ~/docker/monitoring/docker-compose.yml</code></pre>
+
+            <p>Add the following content:</p>
+
+            <pre><code>version: '3.8'
+
+services:
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/config:/etc/prometheus
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - proxy
+    profiles:
+      - monitoring
+
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    volumes:
+      - ./alertmanager/config:/etc/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    ports:
+      - "9093:9093"
+    networks:
+      - proxy
+    profiles:
+      - monitoring
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    ports:
+      - "9100:9100"
+    networks:
+      - proxy
+    profiles:
+      - monitoring
+
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    ports:
+      - "8080:8080"
+    networks:
+      - proxy
+    profiles:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=secure_password  # Change this!
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3000:3000"
+    networks:
+      - proxy
+    profiles:
+      - monitoring
+
+networks:
+  proxy:
+    external: true
+
+volumes:
+  prometheus_data:
+  grafana_data:</code></pre>
+
+            <h2>Starting the Monitoring Stack</h2>
+
+            <p>Start the monitoring stack with Docker Compose:</p>
+
+            <pre><code>cd ~/docker/monitoring
+docker-compose --profile monitoring up -d</code></pre>
+
+            <h2>Configuring Nginx Proxy Manager for Monitoring Services</h2>
+
+            <p>Now, let's set up proxy hosts in Nginx Proxy Manager for each monitoring service:</p>
+
+            <h3>Prometheus</h3>
+
+            <ol>
+                <li>Go to "Hosts" > "Proxy Hosts" and click "Add Proxy Host"</li>
+                <li>Configure the following:
+                    <ul>
+                        <li>Domain Name: prometheus.yourdomain.com</li>
+                        <li>Scheme: http</li>
+                        <li>Forward Hostname / IP: prometheus</li>
+                        <li>Forward Port: 9090</li>
+                    </ul>
+                </li>
+                <li>Under the "SSL" tab:
+                    <ul>
+                        <li>Select your SSL certificate</li>
+                        <li>Force SSL: Enabled</li>
+                    </ul>
+                </li>
+                <li>Under the "Advanced" tab, add the Authelia configuration (from the previous guide)</li>
+                <li>Click "Save"</li>
+            </ol>
+
+            <h3>Grafana</h3>
+
+            <ol>
+                <li>Go to "Hosts" > "Proxy Hosts" and click "Add Proxy Host"</li>
+                <li>Configure the following:
+                    <ul>
+                        <li>Domain Name: grafana.yourdomain.com</li>
+                        <li>Scheme: http</li>
+                        <li>Forward Hostname / IP: grafana</li>
+                        <li>Forward Port: 3000</li>
+                    </ul>
+                </li>
+                <li>Under the "SSL" tab:
+                    <ul>
+                        <li>Select your SSL certificate</li>
+                        <li>Force SSL: Enabled</li>
+                    </ul>
+                </li>
+                <li>Under the "Advanced" tab, add the Authelia configuration</li>
+                <li>Click "Save"</li>
+            </ol>
+
+            <h3>Alert Manager</h3>
+
+            <ol>
+                <li>Go to "Hosts" > "Proxy Hosts" and click "Add Proxy Host"</li>
+                <li>Configure the following:
+                    <ul>
+                        <li>Domain Name: alerts.yourdomain.com</li>
+                        <li>Scheme: http</li>
+                        <li>Forward Hostname / IP: alertmanager</li>
+                        <li>Forward Port: 9093</li>
+                    </ul>
+                </li>
+                <li>Under the "SSL" tab:
+                    <ul>
+                        <li>Select your SSL certificate</li>
+                        <li>Force SSL: Enabled</li>
+                    </ul>
+                </li>
+                <li>Under the "Advanced" tab, add the Authelia configuration</li>
+                <li>Click "Save"</li>
+            </ol>
+
+            <h2>Configuring Grafana</h2>
+
+            <ol>
+                <li>Access Grafana at https://grafana.yourdomain.com</li>
+                <li>Log in with the default credentials:
+                    <ul>
+                        <li>Username: admin</li>
+                        <li>Password: secure_password (the one you set in docker-compose.yml)</li>
+                    </ul>
+                </li>
+                <li>You'll be prompted to change the default password</li>
+            </ol>
+
+            <h3>Adding Prometheus as a Data Source</h3>
+
+            <ol>
+                <li>Go to "Configuration" > "Data Sources"</li>
+                <li>Click "Add data source"</li>
+                <li>Select "Prometheus"</li>
+                <li>Set the URL to http://prometheus:9090</li>
+                <li>Click "Save & Test"</li>
+            </ol>
+
+            <h3>Importing Dashboards</h3>
+
+            <p>Let's import some useful dashboards:</p>
+
+            <ol>
+                <li>Go to "Create" > "Import"</li>
+                <li>Enter one of these dashboard IDs:
+                    <ul>
+                        <li>1860 (Node Exporter Full)</li>
+                        <li>893 (Docker and System Monitoring)</li>
+                        <li>10619 (Docker Monitoring)</li>
+                    </ul>
+                </li>
+                <li>Click "Load"</li>
+                <li>Select "Prometheus" as the data source</li>
+                <li>Click "Import"</li>
+            </ol>
+
+            <p>Repeat for each dashboard ID.</p>
+
+            <h2>Creating Custom Alerts</h2>
+
+            <p>You can create custom alerts in Grafana:</p>
+
+            <ol>
+                <li>Go to "Alerting" in the left sidebar</li>
+                <li>Click "New alert rule"</li>
+                <li>Configure your alert conditions</li>
+                <li>Set notification channels (email, Slack, etc.)</li>
+                <li>Save the alert</li>
+            </ol>
+
+            <h2>Testing Alerts</h2>
+
+            <p>To test if your alerts are working:</p>
+
+            <ol>
+                <li>For CPU alerts: Run a stress test
+                    <pre><code>sudo apt install stress
+stress --cpu 8 --timeout 300</code></pre>
+                </li>
+                <li>For disk space alerts: Create a large file
+                    <pre><code>fallocate -l 10G /tmp/large_file</code></pre>
+                </li>
+                <li>Check Alert Manager at https://alerts.yourdomain.com to see if alerts are triggered</li>
+            </ol>
+
+            <h2>Troubleshooting</h2>
+
+            <h3>Prometheus Issues</h3>
+
+            <ul>
+                <li>Check logs: <code>docker logs prometheus</code></li>
+                <li>Verify prometheus.yml syntax</li>
+                <li>Check if targets are up in the Prometheus UI (Status > Targets)</li>
+            </ul>
+
+            <h3>Grafana Issues</h3>
+
+            <ul>
+                <li>Check logs: <code>docker logs grafana</code></li>
+                <li>Verify data source connection</li>
+                <li>Check permissions on grafana_data volume</li>
+            </ul>
+
+            <h3>Alert Manager Issues</h3>
+
+            <ul>
+                <li>Check logs: <code>docker logs alertmanager</code></li>
+                <li>Verify alertmanager.yml syntax</li>
+                <li>Test email or Slack notifications manually</li>
+            </ul>
+
+            <h2>Next Steps</h2>
+
+            <p>Now that you have your monitoring stack set up, you can proceed to the next section to configure Loki and Promtail for centralized logging.</p>
+
+            <div class="navigation-links">
+                <a href="02-nginx-authelia.html" class="btn">Previous: Nginx Proxy Manager & Authelia Setup</a>
+                <a href="04-loki-promtail.html" class="btn">Next: Loki & Promtail Setup</a>
+            </div>
+        </div>
+    </main>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2025 Home Server Setup Guide | <a href="https://github.com/DeepLinkNetwork/HomeServerSetupGuide" target="_blank">GitHub Repository</a></p>
+        </div>
+    </footer>
+
+    <script src="../js/script.js"></script>
+</body>
+</html>
