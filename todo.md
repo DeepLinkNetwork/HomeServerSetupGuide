@@ -41,7 +41,7 @@
 - [x] Test website locally
 
 ## Deployment
-- [ ] Prepare GitHub repository
-- [ ] Set up SSH deploy key
-- [ ] Push documentation and code to repository
-- [ ] Verify deployment
+- [x] Prepare GitHub repository
+- [x] Set up SSH deploy key
+- [x] Push documentation and code to repository
+- [x] Verify deployment
