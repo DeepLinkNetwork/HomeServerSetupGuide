@@ -2,6 +2,8 @@
 
 This comprehensive guide will help you set up a secure and monitored home server using Ubuntu Server. The guide covers the following components:
 
+![Server Diagram](https://raw.githubusercontent.com/DeepLinkNetwork/HomeServerSetupGuide/refs/heads/main/website/images/server-diagram.svg)
+
 ## Components
 
 1. **Nginx Proxy Manager with Authelia**
