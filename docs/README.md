@@ -4,6 +4,8 @@ This comprehensive guide will help you set up a secure and monitored home server
 
 ![Server Diagram](https://raw.githubusercontent.com/DeepLinkNetwork/HomeServerSetupGuide/refs/heads/main/website/images/server-diagram.svg)
 
+[Visit the Home Server Setup Guide](https://deeplinknetwork.github.io/HomeServerSetupGuide/)
+
 ## Components
 
 1. **Nginx Proxy Manager with Authelia**
